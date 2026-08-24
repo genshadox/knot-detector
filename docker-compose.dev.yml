@@ -1,0 +1,21 @@
+services:
+  runner:
+
+    container_name: smarti
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+      args:
+          UID: ${UID:-1000}
+          GID: ${GID:-1001}
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./src:/src 
+    
+    ports:
+      - 5678:5678 # debug port
