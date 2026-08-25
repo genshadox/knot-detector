@@ -17,6 +17,8 @@ services:
     volumes:
       - ./src:/src
       - ${LOG_DIR_PATH}:/data/logs
+      - ${INPUT_DIR_PATH}:/data/input
+      - ${OUTPUT_DIR_PATH}:/data/output
     
     ports:
       - 5678:5678 # debug port
