@@ -2,24 +2,106 @@ from pathlib import Path
 
 
 def get_project_root() -> Path:
+    """
+    Get the root directory of the project.
+
+    Returns:
+        Path: The root directory of the project.
+    """
     return Path(__file__).parent
 
 
 def get_data_dir() -> Path:
+    """
+    Get the data directory path.
+
+    Returns:
+        Path: The data directory path.
+    """
     return Path("/data")
 
 
 def get_logs_path() -> Path:
+    """
+    Get the logs directory path.
+
+    Returns:
+        Path: The logs directory path.
+    """
     return get_data_dir() / "logs"
 
 
 def get_model_path() -> Path:
+    """
+    Get the path to the YOLO model weights file.
+
+    Returns:
+        Path: The path to the YOLO model weights file.
+    """
     return get_project_root() / "model" / "weights" / "best.pt"
 
 
 def get_output_path() -> Path:
+    """
+    Get the output directory path.
+
+    Returns:
+        Path: The output directory path.
+    """
     return get_data_dir() / "output"
 
 
 def get_input_path() -> Path:
+    """
+    Get the input directory path.
+
+    Returns:
+        Path: The input directory path.
+    """
     return get_data_dir() / "input"
+
+
+def xyxy_to_xywh(
+    xyxy: tuple[float, float, float, float], width: int, height: int
+) -> tuple[float, float, float, float]:
+    """
+    Convert bounding box from (x_min, y_min, x_max, y_max) format to (x_center, y_center, width, height) format, normalized by image width and height.
+
+    Args:
+        xyxy (tuple[float, float, float, float]): Bounding box in (x_min, y_min, x_max, y_max) format.
+        width (int): Width of the image.
+        height (int): Height of the image.
+
+    Returns:
+        tuple[float, float, float, float]: Bounding box in (x_center, y_center, width, height) format, normalized.
+    """
+
+    x_min, y_min, x_max, y_max = xyxy
+
+    w = x_max - x_min
+    h = y_max - y_min
+
+    x_center = x_min + w / 2
+    y_center = y_min + h / 2
+
+    return (
+        x_center / width,
+        y_center / height,
+        w / width,
+        h / height,
+    )
+
+
+def save_labels(
+    boxes: list[tuple[float, float, float, float]], cls: int, path: Path
+) -> None:
+    """
+    Save bounding box labels to a file in YOLO format.
+
+    Args:
+        boxes (list[tuple[float, float, float, float]]): List of bounding boxes in (x_center, y_center, width, height) format, normalized.
+        cls (int): Class ID for all bounding boxes.
+        path (Path): Path to the output label file.
+    """
+    with open(path, "w") as f:
+        f.writelines(f"{cls} {x} {y} {w} {h}\n" for x, y, w, h in boxes)
