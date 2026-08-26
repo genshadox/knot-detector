@@ -60,6 +60,15 @@ def get_input_path() -> Path:
     """
     return get_data_dir() / "input"
 
+def get_test_input_path() -> Path:
+    """
+    Get the test input directory path.
+
+    Returns:
+        Path: The test input directory path.
+    """
+    return get_data_dir() / "test_input"
+
 
 def xyxy_to_xywh(
     xyxy: tuple[float, float, float, float], width: int, height: int
@@ -91,6 +100,35 @@ def xyxy_to_xywh(
         h / height,
     )
 
+def xywh_to_xyxy(
+    xywh: tuple[float, float, float, float], width: int, height: int
+) -> tuple[float, float, float, float]:
+    """
+    Convert bounding box from (x_center, y_center, width, height) format to (x_min, y_min, x_max, y_max) format.
+
+    Args:
+        xywh (tuple[float, float, float, float]): Bounding box in (x_center, y_center, width, height) format.
+        width (int): Width of the image.
+        height (int): Height of the image.
+
+    Returns:
+        tuple[float, float, float, float]: Bounding box in (x_min, y_min, x_max, y_max) format.
+    """
+
+    x_center_norm, y_center_norm, w_norm, h_norm = xywh
+
+    w = w_norm * width
+    h = h_norm * height
+
+    x_center = x_center_norm * width
+    y_center = y_center_norm * height
+
+    x_min = x_center - w / 2
+    y_min = y_center - h / 2
+    x_max = x_center + w / 2
+    y_max = y_center + h / 2
+
+    return (x_min, y_min, x_max, y_max)
 
 def save_labels(
     boxes: list[tuple[float, float, float, float]], cls: int, path: Path
