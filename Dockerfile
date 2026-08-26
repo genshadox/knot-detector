@@ -38,8 +38,7 @@ EXPOSE 5678
 
 USER appuser
 
-CMD ["debugpy", "--listen", "5678", "--wait-for-client", "./main.py"]
-
+CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "./main.py"]
 
 # PROD
 FROM base AS prod
