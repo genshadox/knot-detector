@@ -1,0 +1,22 @@
+services:
+  runner:
+
+    container_name: smarti
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+      args:
+          UID: ${UID:-1000}
+          GID: ${GID:-1001}
+
+    env_file:
+      - .env
+
+    volumes:
+      - ${LOG_DIR_PATH}:/data/logs
+      - ${INPUT_DIR_PATH}:/data/input
+      - ${OUTPUT_DIR_PATH}:/data/output
+      - ${TEST_DIR_PATH}:/data/test_input
+    
