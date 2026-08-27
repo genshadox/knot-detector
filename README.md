@@ -1,143 +1,95 @@
 # Wood Board Knot Detection
 
-A Python program that detects knots in wood boards from sequential camera
-frames, using an Ultralytics YOLO11n model, and outputs knot bounding boxes
-per board in board space (not frame space).
+Detects knots in wood boards from sequential camera frames using YOLO11n,
+and outputs knot bounding boxes per board (board-space, not frame-space).
 
 ## How it works
 
-Boards are captured as a sequence of overlapping frames, named
-`{boardIndex}_{frameNumber}.png`. The program:
+Frames are named `{boardIndex}_{frameNumber}.png`. Assumed non-overlapping,
+no gaps, per the task brief.
 
-1. Groups frames by board index and sorts them by frame number.
-2. Runs YOLO inference on each frame independently.
-3. Stitches per-frame detections into board space by accumulating each
-   frame's pixel offset along the board's long axis, then normalizing to the
-   final board width/height.
-4. Saves, per board:
-   - `{board_id}.txt` - detected boxes in YOLO format (`cls x_center y_center
-     width height`, normalized to the full board), the same format as this
-     project's own training labels
-   - `{board_id}.png` - the stitched board image with detected boxes drawn
+1. Group frames by board, sort by frame number.
+2. Run YOLO inference per frame.
+3. Stitch detections into board space (accumulate x-offset per frame,
+   normalize at the end).
+4. Save per board:
+   - `{board_id}.txt` - detections in YOLO format, board-space
+   - `{board_id}.png` - stitched board image with boxes drawn
    - `{board_id}/` - per-frame results
 
-## Output format: xywh (YOLO) bounding boxes
+## Output format
 
-The dataset's ground-truth labels are YOLO-style bounding boxes, so the
-output uses the same format. No segmentation masks exist to train or
-validate a true polygon-tracing model against, so that approach wasn't
-pursued.
-
-## Output space: per-board, not per-frame
-
-Output is composed at the board level, not per-frame. All box coordinates
-in `{board_id}.txt` are normalized to the full stitched board, not to any
-individual frame.
+Bounding boxes (YOLO xywh - board space), not traced polygons - no segmentation ground
+truth exists to train or validate against.
 
 ## Known limitations
 
-- **Knots spanning two frames.** Frames overlap, and a knot near a frame
-  boundary can be detected once in each of the two adjacent frames. These
-  are not currently merged - they appear as two separate (overlapping)
-  boxes in the board-space output. See [Future work](#future-work).
-- **Duplicate detections.** Independent of the above, the model
-  occasionally produces more than one detection for the same knot within a
-  single frame - an NMS tuning issue (`iou=` in `model.predict()`), not a
-  board-stitching issue. See [Future work](#future-work).
+- **Cross-frame knots**: a knot at a frame boundary can be detected in
+  both adjacent frames; not currently merged.
+- **Duplicate detections**: near-duplicate boxes are handled by NMS
+  tuning (see below). Fully-nested box-in-box duplicates are not - IoU is
+  low for these regardless of NMS threshold, so they need a separate
+  containment check (not implemented). See [Future work](#future-work).
 
 ## Training
 
-- Model: YOLO11n, trained from Ultralytics pretrained weights. Full
-  training configuration is in `src/model/args.yaml`, shipped alongside the
-  model weights.
-- Board 1043 had a corrupted label and was excluded from training/val
-  statistics; it was split into the validation set manually.
-- The train/val split is done at the **board** level, not frame level,
-  since frames within a board overlap - a frame-level split would leak the
-  same physical knots into both sets.
-- The split is stratified by knot size (max knot area per board, bucketed
-  into quartiles) and targets roughly 70/30 train/val, so both sets get a
-  proportional mix of boards with small and large knots rather than
-  relying on random luck.
+- YOLO11n, pretrained weights. Config: `model/args.yaml`.
+- Board 1043 had a corrupted label - excluded from stats, split into train/val
+  manually.
+- Train/val split is per-board (not per-frame, since frames within a
+  board overlap in the training set) and stratified by max knot size per
+  board, targeting ~70/30.
+- Inference NMS `iou=0.5` (default 0.7) - lowered to cut duplicate
+  detections. Checked against GT: real knots never exceed 0.5 IoU with
+  each other, so this doesn't risk merging distinct knots.
 
 ## Test mode
 
-Set `MODE=test` (vs `MODE=infer`) to compare this program's board-space
-output against a ground-truth test set, rather than validating the model
-in isolation (which `model.val()` would do, frame-space only).
+`MODE=test` runs the full pipeline and compares board-space output
+against a ground-truth test set (rather than validating the model alone,
+frame-space, like `model.val()` would).
 
-**Test input** (`TEST_DIR_PATH`): frames in the usual
-`{boardIndex}_{frameNumber}.png` naming, plus one ground-truth label file
-per board, `{board_id}.txt`, in the same board-space YOLO format as this
-program's own output.
+**Input** (`TEST_DIR_PATH`): frames + one `{board_id}.txt` GT label file
+per board, same board-space format as this program's output.
 
-**Test output**, into a `compare/` subfolder (cleared at the start of each
-run): the usual inference output, plus per board:
-
-- ground-truth boxes drawn on top of `{board_id}.png` in a distinct
-  color/thickness, for visual comparison
-- `{board_id}_compare.json` - `matched`, `missed`, `false_positives`, and
-  `mean_iou_matched`, from IoU-based matching (`ultralytics.utils.metrics.box_iou`
-  + Hungarian assignment via `scipy.optimize.linear_sum_assignment`, so a
-  duplicate detection can't double-count a match) at an IoU threshold of
-  0.5 (configurable)
-
-A `summary.json` aggregates pooled counts across the whole test set.
+**Output** (`compare/` subfolder, cleared each run):
+- GT boxes drawn over `{board_id}.png` for visual comparison
+- `{board_id}_compare.json`: `matched` / `missed` / `false_positives` /
+  `mean_iou_matched`, via IoU matching (`box_iou` + Hungarian assignment,
+  avoids double-counting duplicates) at IoU ≥ 0.5
+- `summary.json`: pooled totals across the test set
 
 ## Running
 
-Configure via `.env` (see `.env.example`):
-
-| Variable         | Purpose                                              |
-|------------------|-------------------------------------------------------|
-| `MODE`           | `infer` for normal operation, `test` for test mode    |
-| `INPUT_DIR_PATH` | Host path to input frames (inference mode)            |
-| `OUTPUT_DIR_PATH`| Host path for inference output                        |
-| `TEST_DIR_PATH`  | Host path to the test set (frames + GT labels)         |
-| `LOG_DIR_PATH`   | Host path for log output                               |
-| `UID` / `GID`    | Container user/group ID (match host user for file perms) |
-
-
-Make sure you have permissions on these folders. 
-
-Build and run via Docker Compose. Two compose files are provided:
-
-- `docker-compose.yml` - production image, runs pre-built code baked into
-  the image (no source bind mount, no debug port)
-- `docker-compose.dev.yml` - development image, bind-mounts `./src` and
-  exposes a debug port
-
 ```bash
-# production
-docker compose up
-
-# development
-docker compose -f docker-compose.dev.yml up
+docker compose up                              # production
+docker compose -f docker-compose.dev.yml up    # development
 ```
 
+Configure via `.env`:
+
+| Variable         | Purpose                                  |
+|------------------|-------------------------------------------|
+| `MODE`           | `infer` or `test`                        |
+| `INPUT_DIR_PATH` | input frames (infer)                     |
+| `OUTPUT_DIR_PATH`| inference output                         |
+| `TEST_DIR_PATH`  | test set (frames + GT labels)            |
+| `LOG_DIR_PATH`   | logs                                     |
+| `UID` / `GID`    | container user/group (match host)        |
 
 ## Project structure
 
-- `main.py` - entry point, mode branching (`infer` vs `test`)
-- `model_runner.py` - wraps the YOLO model; runs inference per board,
-  per-frame, with per-board error isolation (a corrupted or failing frame
-  means that frame's board can't be reconstructed in board space, since its
-  width is unknown - the whole board is skipped and logged, not just that
-  frame)
-- `board.py` - `Board`/`Frame` data model; board grouping, board-space
-  coordinate accumulation, stitched-image + label output
-- `test.py` - test-mode comparison logic (label loading, IoU-based
-  matching, JSON reporting)
-- `util.py` - stateless helpers: path resolution, label I/O, coordinate
-  format conversion, box drawing
-- `logger.py` - logging setup (rotating file handler + console output)
-- `model/args.yaml` - training configuration for the shipped model weights
+- `main.py` - entry point, mode branching
+- `model_runner.py` - YOLO inference, per-board error isolation
+- `board.py` - `Board`/`Frame` model, board-space stitching
+- `test.py` - test-mode comparison
+- `util.py` - path/label/coordinate helpers
+- `logger.py` - logging setup
+- `model/args.yaml` - training config
 
 ## Future work
 
-- **`iou=` tuning** in `model.predict()` to reduce remaining duplicate
-  detections within a single frame (separate from the `conf=` threshold)
-- **Cross-frame knot merging** - knots spanning a frame boundary currently
-  appear as two overlapping boxes rather than one merged box; a reasonable
-  approach would be merging boxes that touch/overlap near a frame edge
-- Further model tuning/training iteration
+- Containment-based filter for nested duplicate boxes (`bbox_ioa`)
+- Merge knots split across a frame boundary
+- Further model tuning
+- Use frame overlap so boundary knots appear whole in at least one frame
