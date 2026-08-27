@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 
 def get_project_root() -> Path:
     """
@@ -60,6 +63,7 @@ def get_input_path() -> Path:
     """
     return get_data_dir() / "input"
 
+
 def get_test_input_path() -> Path:
     """
     Get the test input directory path.
@@ -100,6 +104,7 @@ def xyxy_to_xywh(
         h / height,
     )
 
+
 def xywh_to_xyxy(
     xywh: tuple[float, float, float, float], width: int, height: int
 ) -> tuple[float, float, float, float]:
@@ -130,6 +135,7 @@ def xywh_to_xyxy(
 
     return (x_min, y_min, x_max, y_max)
 
+
 def save_labels(
     boxes: list[tuple[float, float, float, float]], cls: int, path: Path
 ) -> None:
@@ -143,3 +149,54 @@ def save_labels(
     """
     with open(path, "w") as f:
         f.writelines(f"{cls} {x} {y} {w} {h}\n" for x, y, w, h in boxes)
+
+
+def load_labels(path: Path) -> list[tuple[float, float, float, float]]:
+    """
+    Load bounding box labels from a file in YOLO format.
+
+    Args:
+        path (Path): Path to the label file.
+
+    Returns:
+        list[tuple[float, float, float, float]]: List of bounding boxes in (x_center, y_center, width, height) format, normalized.
+    """
+    with open(path) as f:
+        boxes = []
+
+        for line in f:
+            if line.strip():
+                values = line.split()[1:]  # Skip the class ID
+                boxes.append(tuple(float(v) for v in values))
+
+        return boxes
+
+
+def draw_boxes(
+    image_array: np.ndarray,
+    boxes_xyxy: list[tuple[float, float, float, float]],
+    thickness: int = 3,
+    color: tuple[int, int, int] = (0, 255, 0),
+) -> np.ndarray:
+    """
+    Draw bounding boxes on an image.
+
+    Args:
+        image_array (np.ndarray): The image on which to draw the bounding boxes.
+        boxes_xyxy (list[tuple[float, float, float, float]]): List of bounding boxes in (x_min, y_min, x_max, y_max) format.
+        color (tuple[int, int, int], optional): Color of the bounding boxes in BGR format. Defaults to green (0, 255, 0).
+
+    Returns:
+        np.ndarray: The image with bounding boxes drawn on it.
+    """
+
+    for x_min, y_min, x_max, y_max in boxes_xyxy:
+        cv2.rectangle(
+            image_array,
+            (int(x_min), int(y_min)),
+            (int(x_max), int(y_max)),
+            color=color,
+            thickness=thickness,
+        )
+
+    return image_array

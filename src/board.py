@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from ultralytics.engine.results import Results
 
-from util import save_labels, xyxy_to_xywh
+from util import draw_boxes, save_labels, xyxy_to_xywh
 
 
 def build_boards(paths: list[Path]) -> list["Board"]:
@@ -37,7 +37,7 @@ class Frame:
     """
     Represents a single frame in a board.
     """
-    
+
     path: Path
     frame_num: int
     results: Results | None = None  # Results will be set after inference
@@ -118,16 +118,9 @@ class Board:
         images = [cv2.imread(str(p)) for p in image_paths]
         stitched = np.hstack(images)  # same height assumed across frames
 
-        for x_min, y_min, x_max, y_max in boxes_xyxy:
-            cv2.rectangle(
-                stitched,
-                (int(x_min), int(y_min)),
-                (int(x_max), int(y_max)),
-                color=(0, 255, 0),
-                thickness=2,
-            )
+        data = draw_boxes(stitched, boxes_xyxy, thickness=3, color=(0, 255, 0))
 
-        cv2.imwrite(str(output_path), stitched)
+        cv2.imwrite(str(output_path), data)
 
     def to_board_space(self) -> tuple[list, list]:
         """
@@ -139,18 +132,16 @@ class Board:
                 - List of bounding boxes in xywh format, normalized by board width and height.
         """
 
-
         width = height = 0
         boxes_xyxy = []
 
         for frame in self.frames:
-
             assert frame.results is not None
 
             result = frame.results
             height = max(height, result.orig_shape[0])
 
-            for box in result.boxes.xyxy:
+            for box in result.boxes.xyxy:  # type: ignore
                 x_min, y_min, x_max, y_max = box.tolist()
                 boxes_xyxy.append((x_min + width, y_min, x_max + width, y_max))
 
