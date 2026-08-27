@@ -9,7 +9,7 @@ services:
       target: prod
       args:
           UID: ${UID:-1000}
-          GID: ${GID:-1001}
+          GID: ${GID:-1000}
 
     env_file:
       - .env
