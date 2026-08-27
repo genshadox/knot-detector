@@ -76,6 +76,7 @@ class ModelRunner:
                 project=str(output_folder),
                 name=name,
                 exist_ok=True,
+                iou=0.5,
             )
 
             return results[0]  # Only 1 frame so only 1 result (with multiple boxes)
