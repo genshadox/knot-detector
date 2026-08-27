@@ -98,6 +98,8 @@ Configure via `.env` (see `.env.example`):
 | `UID` / `GID`    | Container user/group ID (match host user for file perms) |
 
 
+Make sure you have permissions on these folders. 
+
 Build and run via Docker Compose. Two compose files are provided:
 
 - `docker-compose.yml` - production image, runs pre-built code baked into
