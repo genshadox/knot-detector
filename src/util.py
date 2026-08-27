@@ -200,3 +200,22 @@ def draw_boxes(
         )
 
     return image_array
+
+
+def del_dir_contents(folder_path: Path) -> None:
+    """
+    Delete all contents of a directory.
+
+    Args:
+        folder_path (Path): Path to the directory whose contents are to be deleted.
+    """
+
+    if not folder_path.is_dir():
+        return
+
+    for item in folder_path.iterdir():
+        if item.is_dir():
+            del_dir_contents(item)
+            item.rmdir()
+        else:
+            item.unlink()

@@ -7,6 +7,7 @@ from logger import setup_logging
 from model_runner import ModelRunner
 from test import test_results
 from util import (
+    del_dir_contents,
     get_input_path,
     get_model_path,
     get_output_path,
@@ -47,6 +48,7 @@ def main():
 
         test_input_path = get_test_input_path()
         test_input_path_compare = test_input_path / "compare"
+        del_dir_contents(test_input_path_compare)
 
         run_inference(
             model_runner=model_runner,
