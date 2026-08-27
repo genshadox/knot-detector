@@ -19,6 +19,7 @@ services:
       - ${LOG_DIR_PATH}:/data/logs
       - ${INPUT_DIR_PATH}:/data/input
       - ${OUTPUT_DIR_PATH}:/data/output
+      - ${TEST_DIR_PATH}:/data/test_input
     
     ports:
       - 5678:5678 # debug port
