@@ -61,6 +61,8 @@ per board, same board-space format as this program's output.
 
 ## Running
 
+Inference runs on CPU (no CUDA/GPU dependency required).
+
 ```bash
 docker compose up                              # production
 docker compose -f docker-compose.dev.yml up    # development
