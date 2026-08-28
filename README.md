@@ -52,7 +52,7 @@ frame-space, like `model.val()` would).
 **Input** (`TEST_DIR_PATH`): frames + one `{board_id}.txt` GT label file
 per board, same board-space format as this program's output.
 
-**Output** (`compare/` subfolder, cleared each run):
+**Output** (`compare/` subfolder):
 - GT boxes drawn over `{board_id}.png` for visual comparison
 - `{board_id}_compare.json`: `matched` / `missed` / `false_positives` /
   `mean_iou_matched` / `precision` / `recall`, via IoU matching (`box_iou` + Hungarian assignment,
@@ -75,7 +75,9 @@ Configure via `.env`:
 | `OUTPUT_DIR_PATH`| inference output                         |
 | `TEST_DIR_PATH`  | test set (frames + GT labels)            |
 | `LOG_DIR_PATH`   | logs                                     |
+| `CLEANUP`        | delete results from previous run         |
 | `UID` / `GID`    | container user/group (match host)        |
+
 
 ## Project structure
 
