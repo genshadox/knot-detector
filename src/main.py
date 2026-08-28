@@ -34,10 +34,11 @@ def run_inference(model_runner: ModelRunner, input_path: Path, output_path: Path
 
 def main():
     """
-    Main function to run the inference process based on the specified mode (test or normal).
+    Main function to run the inference process based on the specified mode (test or normal) and handle cleanup if specified.
     """
 
     mode = os.environ["MODE"]
+    cleanup = os.environ.get("CLEANUP", "true").lower() == "true"
 
     model_runner = ModelRunner(model_path=get_model_path())
 
@@ -48,7 +49,9 @@ def main():
 
         test_input_path = get_test_input_path()
         test_input_path_compare = test_input_path / "compare"
-        del_dir_contents(test_input_path_compare)
+
+        if cleanup:
+            del_dir_contents(test_input_path_compare)
 
         run_inference(
             model_runner=model_runner,
@@ -63,10 +66,15 @@ def main():
             "Running in normal mode. Inference results will be saved to the 'output' folder."
         )
 
+        output_path = get_output_path()
+        
+        if cleanup:
+            del_dir_contents(output_path)
+
         run_inference(
             model_runner=model_runner,
             input_path=get_input_path(),
-            output_path=get_output_path(),
+            output_path=output_path,
         )
 
     logger.info("done")
