@@ -61,16 +61,6 @@ class Board:
         self.frames: list[Frame] = frames
         self.CLS: int = 0  # we have only class 0
 
-    def frame_paths(self) -> list[Path]:
-        """
-        Get the paths of all frames in the board.
-
-        Returns:
-            list[Path]: List of paths for all frames in the board.
-        """
-
-        return [f.path for f in self.frames]
-
     def set_frame_results(self, frame_num: int, result: Results | None):
         """
         Set the results for a specific frame in the board.
@@ -99,23 +89,18 @@ class Board:
 
         save_labels(boxes_xywh, self.CLS, output_folder / f"{self.id}.txt")
 
-        self.plot_board(
-            self.frame_paths(), boxes_xyxy, output_folder / f"{self.id}.png"
-        )
+        self.plot_board(boxes_xyxy, output_folder / f"{self.id}.png")
 
-    def plot_board(
-        self, image_paths: list[Path], boxes_xyxy: list[tuple], output_path: Path
-    ):
+    def plot_board(self, boxes_xyxy: list[tuple], output_path: Path):
         """
         Plot the board by stitching frames together and drawing bounding boxes.
 
         Args:
-            image_paths (list[Path]): List of paths to the frame images.
             boxes_xyxy (list[tuple]): List of bounding boxes in xyxy format.
             output_path (Path): Path to save the plotted board image.
         """
 
-        images = [cv2.imread(str(p)) for p in image_paths]
+        images = [frame.results.orig_img for frame in self.frames] # type: ignore
         stitched = np.hstack(images)  # same height assumed across frames
 
         data = draw_boxes(stitched, boxes_xyxy, thickness=3, color=(0, 255, 0))
