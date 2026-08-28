@@ -55,7 +55,7 @@ per board, same board-space format as this program's output.
 **Output** (`compare/` subfolder, cleared each run):
 - GT boxes drawn over `{board_id}.png` for visual comparison
 - `{board_id}_compare.json`: `matched` / `missed` / `false_positives` /
-  `mean_iou_matched`, via IoU matching (`box_iou` + Hungarian assignment,
+  `mean_iou_matched` / `precision` / `recall`, via IoU matching (`box_iou` + Hungarian assignment,
   avoids double-counting duplicates) at IoU ≥ 0.5
 - `summary.json`: pooled totals across the test set
 
