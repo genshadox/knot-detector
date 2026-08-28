@@ -91,14 +91,19 @@ def summarize(
         false_positives (int): Number of false positive boxes.
         matched_ious (list[float]): List of IoUs of matched boxes.
     Returns:
-        dict: A dictionary containing the number of matched boxes, missed boxes, false positives, and mean IoU of matched boxes.
+        dict: A dictionary containing the number of matched boxes, missed boxes, false positives, mean IoU of matched boxes, precision, and recall.
     """
+
+    precision = matched / (matched + false_positives) if (matched + false_positives) else 0.0
+    recall = matched / (matched + missed) if (matched + missed) else 0.0
 
     return {
         "matched": matched,
         "missed": missed,
         "false_positives": false_positives,
         "mean_iou_matched": sum(matched_ious) / matched if matched else 0.0,
+        "precision": precision,
+        "recall": recall,
     }
 
 
