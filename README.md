@@ -69,7 +69,7 @@ per board, same board-space format as this program's output.
 
 ## Tests
 
-Unit tests cover `filter_boxes_ioa_merge` Kept in `tests/`,
+Unit tests cover `filter_boxes_ioa_merge` and `compare_labels`. Kept in `tests/`,
 outside `src/`, so `pytest` and test files never end up in the prod
 image.
 
