@@ -7,6 +7,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from ultralytics.utils.metrics import box_iou
 
+from params import TEST_IOU_THRESHOLD
 from util import draw_boxes, load_labels, xywh_to_xyxy
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,9 @@ def summarize(
         dict: A dictionary containing the number of matched boxes, missed boxes, false positives, mean IoU of matched boxes, precision, and recall.
     """
 
-    precision = matched / (matched + false_positives) if (matched + false_positives) else 0.0
+    precision = (
+        matched / (matched + false_positives) if (matched + false_positives) else 0.0
+    )
     recall = matched / (matched + missed) if (matched + missed) else 0.0
 
     return {
@@ -156,7 +159,9 @@ def test_results(test_path: Path, compare_path: Path):
         output_boxes_xyxy = load_labels_xyxy(output_label_file, width, height)
 
         matched, missed, false_positives, matched_ious = compare_labels(
-            gt_boxes_xyxy, output_boxes_xyxy
+            gt_boxes_xyxy,
+            output_boxes_xyxy,
+            iou_threshold=TEST_IOU_THRESHOLD,
         )
 
         total_matched += matched

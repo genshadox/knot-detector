@@ -9,6 +9,7 @@ import torch
 from ultralytics.engine.results import Boxes
 from ultralytics.utils.metrics import bbox_ioa
 
+from params import POST_MERGE_IOA_THRESHOLD
 from util import draw_boxes, save_labels, xyxy_to_xywh
 
 logger = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ class Board:
 
         logger.info("working on board %s", self.id)
         boxes_xyxy_conf = self.filter_boxes_ioa_merge(
-            boxes_xyxy_conf, ioa_threshold=0.35
+            boxes_xyxy_conf, ioa_threshold=POST_MERGE_IOA_THRESHOLD
         )
 
         boxes_xyxy = [xyxy for xyxy, conf in boxes_xyxy_conf]
@@ -167,7 +168,7 @@ class Board:
     def filter_boxes_ioa_merge(
         self,
         boxes_xyxy_conf: list[tuple[tuple[float, float, float, float], float]],
-        ioa_threshold: float = 0.3,
+        ioa_threshold: float,
     ) -> list[tuple[tuple[float, float, float, float], float]]:
         """
         Filter and merge overlapping bounding boxes based on the Intersection over Area (IoA) threshold.
@@ -242,8 +243,8 @@ class Board:
                 float(cluster_boxes[:, 2].max()),
                 float(cluster_boxes[:, 3].max()),
             )
-
             merged_conf = float(cluster_confs.max())
+
             merged_results.append((merged_box, merged_conf))
 
         return merged_results
