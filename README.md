@@ -5,31 +5,39 @@ and outputs knot bounding boxes per board (board-space, not frame-space).
 
 ## How it works
 
-Frames are named `{boardIndex}_{frameNumber}.png`. Assumed non-overlapping,
-no gaps, per the task brief.
+Frames are named `{boardIndex}_{frameNumber}.png`.
 
-1. Group frames by board, sort by frame number.
-2. Run YOLO inference per frame.
-3. Stitch detections into board space (accumulate x-offset per frame,
-   normalize at the end).
-4. Save per board:
+1. Group frames by board, sort by frame number, stitch into one board image.
+2. Slide a fixed-size window (`WINDOW_SIZE`/`WINDOW_STRIDE`) across the
+   board image, running YOLO inference per window.
+3. Shift each window's detections into board-space coordinates.
+4. Merge overlapping cross-window detections of the same knot (see
+   below), then normalize to YOLO format.
+5. Save per board:
    - `{board_id}.txt` - detections in YOLO format, board-space
    - `{board_id}.png` - stitched board image with boxes drawn
-   - `{board_id}/` - per-frame results
 
 ## Output format
 
 Bounding boxes (YOLO xywh - board space), not traced polygons - no segmentation ground
 truth exists to train or validate against.
 
+## Cross-window merging
+
+A knot near a frame/window boundary can be detected more than once
+across overlapping windows. Duplicate detections are merged via IoA
+(intersection-over-area, either direction) above `POST_MERGE_IOA_THRESHOLD`
+(`params.py`) - boxes that substantially contain one another are unioned
+into one box. This also subsumes the old fully-nested box-in-box
+duplicate case (see Known limitations below).
+
 ## Known limitations
 
-- **Cross-frame knots**: a knot at a frame boundary can be detected in
-  both adjacent frames; not currently merged.
-- **Duplicate detections**: near-duplicate boxes are handled by NMS
-  tuning (see below). Fully-nested box-in-box duplicates are not - IoU is
-  low for these regardless of NMS threshold, so they need a separate
-  containment check (not implemented). See [Future work](#future-work).
+- **Fully-nested / cross-window duplicates**: handled by the IoA merge
+  step above; the merge threshold was tuned via sweeps against real val-set metrics,
+  cross-checked against the dataset's own GT overlap patterns
+- **Duplicate detections within a window**: handled by NMS tuning (see
+  below).
 
 ## Training
 
@@ -39,9 +47,9 @@ truth exists to train or validate against.
 - Train/val split is per-board (not per-frame, since frames within a
   board overlap in the training set) and stratified by max knot size per
   board, targeting ~70/30.
-- Inference NMS `iou=0.5` (default 0.7) - lowered to cut duplicate
-  detections. Checked against GT: real knots never exceed 0.5 IoU with
-  each other, so this doesn't risk merging distinct knots.
+- Inference NMS `iou=0.5` (default 0.7, see `params.py`) - lowered to cut
+  duplicate detections. Checked against GT: real knots never exceed 0.5
+  IoU with each other, so this doesn't risk merging distinct knots.
 
 ## Test mode
 
@@ -84,8 +92,9 @@ Configure via `.env`:
 ## Project structure
 
 - `main.py` - entry point, mode branching
-- `model_runner.py` - YOLO inference, per-board error isolation
-- `board.py` - `Board`/`Frame` model, board-space stitching
+- `model_runner.py` - YOLO inference, per-window sliding, per-board error isolation
+- `board.py` - `Board`/`Frame`/`Window` model, board-space stitching and merge
+- `params.py` - inference/NMS/merge thresholds
 - `test.py` - test-mode comparison
 - `util.py` - path/label/coordinate helpers
 - `logger.py` - logging setup
@@ -93,7 +102,7 @@ Configure via `.env`:
 
 ## Future work
 
-- Containment-based filter for nested duplicate boxes (`bbox_ioa`)
-- Merge knots split across a frame boundary
 - Further model tuning
-- Use frame overlap so boundary knots appear whole in at least one frame
+- Re-examine merge threshold if Smarti's real test set behaves
+  differently than our val set
+- Clean up / re-review training labels
