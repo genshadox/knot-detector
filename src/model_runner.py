@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ModelRunner:
     WINDOW_SIZE = 640
-    WINDOW_STRIDE = 640
+    WINDOW_STRIDE = 320
 
     def __init__(self, model_path: Path):
         """
