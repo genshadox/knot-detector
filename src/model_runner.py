@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import numpy as np
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class ModelRunner:
+    WINDOW_SIZE = 640
+    WINDOW_STRIDE = 640
+
     def __init__(self, model_path: Path):
         """
         Initialize the ModelRunner with the specified model path.
@@ -37,12 +41,25 @@ class ModelRunner:
 
         for board in boards:
             try:
-                for frame in board.frames:
+                x = 0
+
+                while x < board.image.shape[1]:
+                    window_data = board.get_window_data(x, self.WINDOW_SIZE)
+
                     results = self.run_inference_single(
-                        frame.path, board.id, output_folder
+                        window_data, board.id, output_folder
                     )
 
-                    board.set_frame_results(frame.frame_num, results)
+                    if results.boxes is None:
+                        logger.warning(
+                            f"No boxes attribute on window result for board {board.id}, x={x} — skipping window."
+                        )
+                        x += self.WINDOW_STRIDE
+                        continue
+
+                    board.add_window(x, results.orig_shape[1], boxes=results.boxes)
+
+                    x += self.WINDOW_STRIDE
 
                 board.save_results(output_folder=output_folder)
 
@@ -54,13 +71,13 @@ class ModelRunner:
         return output_folder
 
     def run_inference_single(
-        self, image_file: Path, name: str, output_folder: Path
+        self, image: np.ndarray, name: str, output_folder: Path
     ) -> Results:
         """
         Run inference on a single image and save the results to the specified output folder.
 
         Args:
-            image_file (Path): Path to the image file to run inference on.
+            image (np.ndarray): The image data as a NumPy array.
             name (str): Name to use for saving the results.
             output_folder (Path): Path to the folder where inference results will be saved.
 
@@ -70,9 +87,9 @@ class ModelRunner:
 
         try:
             results = self.model.predict(
-                source=str(image_file),
-                save=True,
-                save_txt=True,
+                source=image,
+                # save=True,
+                # save_txt=True,
                 project=str(output_folder),
                 name=name,
                 exist_ok=True,
@@ -82,5 +99,5 @@ class ModelRunner:
             return results[0]  # Only 1 frame so only 1 result (with multiple boxes)
 
         except Exception:
-            logger.exception(f"An error occurred while processing {image_file}.")
+            logger.exception("An error occurred while processing.")
             raise
