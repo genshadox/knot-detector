@@ -1,7 +1,7 @@
 services:
   runner:
 
-    container_name: smarti
+    image: smarti:prod
 
     build:
       context: .
