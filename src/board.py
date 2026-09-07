@@ -1,14 +1,18 @@
+import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
-from ultralytics.engine.results import Results
+from ultralytics.engine.results import Boxes
 
 from util import draw_boxes, save_labels, xyxy_to_xywh
 
+logger = logging.getLogger(__name__)
 
-def build_boards(paths: list[Path]) -> list["Board"]:
+
+def build_boards(paths: list[Path]) -> Iterator["Board"]:
     """
     Build Board objects from a list of image paths.
 
@@ -16,20 +20,18 @@ def build_boards(paths: list[Path]) -> list["Board"]:
         paths (list[Path]): List of image file paths.
 
     Returns:
-        list[Board]: List of Board objects with associated frames.
+        Iterator[Board]: Iterator of Board objects with associated frames.
     """
-    boards: dict[str, Board] = {}
+
+    boards: dict[str, list[Frame]] = {}
+
     for path in paths:
         board_id, frame_num = path.stem.split("_")
-        boards.setdefault(board_id, Board(board_id, [])).frames.append(
-            Frame(path, int(frame_num))
-        )
+        boards.setdefault(board_id, []).append(Frame(path, int(frame_num)))
 
-    result = list(boards.values())
-    for board in result:
-        board.frames.sort(key=lambda f: f.frame_num)
-
-    return result
+    for board_id, frames in boards.items():
+        frames.sort(key=lambda f: f.frame_num)
+        yield Board(board_id, frames)
 
 
 @dataclass
@@ -40,7 +42,17 @@ class Frame:
 
     path: Path
     frame_num: int
-    results: Results | None = None  # Results will be set after inference
+
+
+@dataclass
+class Window:
+    """
+    Represents a window within a board, which is a subset of frames.
+    """
+
+    x_offset: int
+    width: int
+    boxes: Boxes
 
 
 class Board:
@@ -61,21 +73,36 @@ class Board:
         self.frames: list[Frame] = frames
         self.CLS: int = 0  # we have only class 0
 
-    def set_frame_results(self, frame_num: int, result: Results | None):
-        """
-        Set the results for a specific frame in the board.
-
-        Args:
-            frame_num (int): Frame number to set the results for.
-            result (Results | None): Results object to associate with the frame.
-        """
+        images = []
 
         for frame in self.frames:
-            if frame.frame_num == frame_num:
-                frame.results = result
-                return
+            image = cv2.imread(str(frame.path))
 
-        raise ValueError(f"No frame {frame_num} in board {self.id}")
+            if image is None:
+                raise ValueError(f"Failed to read frame image: {frame.path}")
+
+            images.append(image)
+
+        self.image: np.ndarray = np.hstack(images)  # same height assumed across frames
+
+    def get_window_data(self, x: int, width: int) -> np.ndarray:
+
+        return self.image[:, x : x + width]
+
+    def add_window(self, x: int, width: int, boxes: Boxes):
+        """
+        Add a window's results to the board.
+
+        Args:
+            x (int): The x-coordinate of the window's top-left corner in the board image.
+            width (int): The width of the window.
+            boxes (Boxes): Bounding boxes and confidence scores for the window.
+        """
+
+        if not hasattr(self, "windows"):
+            self.windows: list[Window] = []
+
+        self.windows.append(Window(x_offset=x, width=width, boxes=boxes))
 
     def save_results(self, output_folder: Path):
         """
@@ -100,37 +127,34 @@ class Board:
             output_path (Path): Path to save the plotted board image.
         """
 
-        images = [frame.results.orig_img for frame in self.frames] # type: ignore
-        stitched = np.hstack(images)  # same height assumed across frames
-
-        data = draw_boxes(stitched, boxes_xyxy, thickness=3, color=(0, 255, 0))
+        data = draw_boxes(self.image, boxes_xyxy, thickness=3, color=(0, 255, 0))
 
         cv2.imwrite(str(output_path), data)
 
     def to_board_space(self) -> tuple[list, list]:
         """
-        Convert bounding boxes from individual frame coordinates to board coordinates.
+            Convert window-level bounding boxes to board-level coordinates and merge overlapping boxes across windows.
 
         Returns:
-            tuple[list, list]: A tuple containing two lists:
-                - List of bounding boxes in xyxy format.
-                - List of bounding boxes in xywh format, normalized by board width and height.
+            tuple[list, list]: A tuple containing a list of bounding boxes in xyxy format and a list of bounding boxes in xywh format.
         """
 
-        width = height = 0
-        boxes_xyxy = []
+        boxes_xyxy_conf = []
 
-        for frame in self.frames:
-            assert frame.results is not None
+        for window in self.windows:
+            assert window.boxes is not None
 
-            result = frame.results
-            height = max(height, result.orig_shape[0])
-
-            for box in result.boxes.xyxy:  # type: ignore
+            for box, conf in zip(window.boxes.xyxy, window.boxes.conf):
                 x_min, y_min, x_max, y_max = box.tolist()
-                boxes_xyxy.append((x_min + width, y_min, x_max + width, y_max))
+                xyxy = (x_min + window.x_offset, y_min, x_max + window.x_offset, y_max)
+                boxes_xyxy_conf.append((xyxy, conf.item()))
 
-            width += result.orig_shape[1]
+        logger.info("working on board %s", self.id)
 
-        boxes_xywh = [xyxy_to_xywh(xyxy, width, height) for xyxy in boxes_xyxy]
+        boxes_xyxy = [xyxy for xyxy, conf in boxes_xyxy_conf]
+        boxes_xywh = [
+            xyxy_to_xywh(xyxy, self.image.shape[1], self.image.shape[0])
+            for xyxy in boxes_xyxy
+        ]
+
         return boxes_xyxy, boxes_xywh
