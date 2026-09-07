@@ -16,6 +16,7 @@ services:
 
     volumes:
       - ./src:/src
+      - ./tests:/tests
       - ${LOG_DIR_PATH}:/data/logs
       - ${INPUT_DIR_PATH}:/data/input
       - ${OUTPUT_DIR_PATH}:/data/output

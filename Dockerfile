@@ -29,7 +29,7 @@ COPY --chown=appuser:appgroup src /src
 FROM base as dev
 
 # For dev, lets install debugpy
-RUN pip install --no-cache-dir debugpy
+RUN pip install --no-cache-dir debugpy pytest
 
 ENV PYDEVD_DISABLE_FILE_VALIDATION=1
 

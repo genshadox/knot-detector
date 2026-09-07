@@ -67,6 +67,17 @@ per board, same board-space format as this program's output.
   avoids double-counting duplicates) at IoU ≥ 0.5
 - `summary.json`: pooled totals across the test set
 
+## Tests
+
+Unit tests cover `filter_boxes_ioa_merge` Kept in `tests/`,
+outside `src/`, so `pytest` and test files never end up in the prod
+image.
+
+```bash
+docker compose -f docker-compose.dev.yml up
+docker compose -f docker-compose.dev.yml exec runner pytest /tests -v
+```
+
 ## Running
 
 Inference runs on CPU (no CUDA/GPU dependency required).
@@ -99,6 +110,7 @@ Configure via `.env`:
 - `util.py` - path/label/coordinate helpers
 - `logger.py` - logging setup
 - `model/args.yaml` - training config
+- `tests/` - unit tests (pytest, dev-only, not in prod image)
 
 ## Future work
 
