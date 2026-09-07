@@ -153,7 +153,7 @@ class Board:
                 boxes_xyxy_conf.append((xyxy, conf.item()))
 
         logger.info("working on board %s", self.id)
-        boxes_xyxy_conf = self.filter_boxes_ioa_merge(
+        boxes_xyxy_conf = filter_boxes_ioa_merge(
             boxes_xyxy_conf, ioa_threshold=POST_MERGE_IOA_THRESHOLD
         )
 
@@ -165,86 +165,86 @@ class Board:
 
         return boxes_xyxy, boxes_xywh
 
-    def filter_boxes_ioa_merge(
-        self,
-        boxes_xyxy_conf: list[tuple[tuple[float, float, float, float], float]],
-        ioa_threshold: float,
-    ) -> list[tuple[tuple[float, float, float, float], float]]:
-        """
-        Filter and merge overlapping bounding boxes based on the Intersection over Area (IoA) threshold.
 
-        Args:
-            boxes_xyxy_conf: list of (box_xyxy, conf) -- board-space boxes from
-                all windows, already flattened (no window_id needed).
-            ioa_threshold: containment ratio (either direction) above which two
-                boxes are considered the same object and merged.
+def filter_boxes_ioa_merge(
+    boxes_xyxy_conf: list[tuple[tuple[float, float, float, float], float]],
+    ioa_threshold: float,
+) -> list[tuple[tuple[float, float, float, float], float]]:
+    """
+    Filter and merge overlapping bounding boxes based on the Intersection over Area (IoA) threshold.
 
-        Returns:
-            list of (box_xyxy, conf) with contained/overlapping pairs merged.
-        """
+    Args:
+        boxes_xyxy_conf: list of (box_xyxy, conf) -- board-space boxes from
+            all windows, already flattened (no window_id needed).
+        ioa_threshold: containment ratio (either direction) above which two
+            boxes are considered the same object and merged.
 
-        if not boxes_xyxy_conf:
-            return []
+    Returns:
+        list of (box_xyxy, conf) with contained/overlapping pairs merged.
+    """
 
-        boxes = torch.tensor([b[0] for b in boxes_xyxy_conf], dtype=torch.float32)
-        confs = torch.tensor([b[1] for b in boxes_xyxy_conf], dtype=torch.float32)
+    if not boxes_xyxy_conf:
+        return []
 
-        num_boxes = len(boxes)
+    boxes = torch.tensor([b[0] for b in boxes_xyxy_conf], dtype=torch.float32)
+    confs = torch.tensor([b[1] for b in boxes_xyxy_conf], dtype=torch.float32)
 
-        # ioa_matrix[i, j] calculation: intersection / area(box_j)
-        ioa_matrix = bbox_ioa(boxes, boxes)
+    num_boxes = len(boxes)
 
-        # Determine passing pairs (if box i covers box j OR box j covers box i)
-        # If the entry (i, j) in the ioa_matrix is > ioa_threshold, it means box i and box j should be merged.
-        adj_matrix = (ioa_matrix > ioa_threshold) | (
-            ioa_matrix.T > ioa_threshold
-        )  # Transpose to check the reverse direction (box j covers box i)
+    # ioa_matrix[i, j] calculation: intersection / area(box_j)
+    ioa_matrix = bbox_ioa(boxes, boxes)
 
-        # Add index to boxes as initial labels
-        labels = torch.arange(num_boxes)
+    # Determine passing pairs (if box i covers box j OR box j covers box i)
+    # If the entry (i, j) in the ioa_matrix is > ioa_threshold, it means box i and box j should be merged.
+    adj_matrix = (ioa_matrix > ioa_threshold) | (
+        ioa_matrix.T > ioa_threshold
+    )  # Transpose to check the reverse direction (box j covers box i)
 
-        # This is a bit tricky
-        # at start, we have all the labels and all are different
-        # than every iteration, overlapping boxes will adopt the minimum label among their neighbors (those connected via the adjacency matrix)
-        # the lables are than compared (if there were any changes)
-        # next step, we repeat the process until no labels change, ensuring all connected boxes share the same label
-        while True:
-            # Map overlapping boxes to their labels - produces a matrix where each row corresponds to a box and contains the labels of its overlapping neighbors
-            map = torch.where(
-                adj_matrix, labels, num_boxes
-            )  # this num boxes is here cuz you can't have None in tensor and its value is guaranteed to be larger than any valid label
+    # Add index to boxes as initial labels
+    labels = torch.arange(num_boxes)
 
-            # Find the minimum label among all overlapping neighbors
-            new_labels = torch.min(map, dim=1)[
-                0
-            ]  # [0] gives values, while [1] gives indices of min values
+    # This is a bit tricky
+    # at start, we have all the labels and all are different
+    # than every iteration, overlapping boxes will adopt the minimum label among their neighbors (those connected via the adjacency matrix)
+    # the lables are than compared (if there were any changes)
+    # next step, we repeat the process until no labels change, ensuring all connected boxes share the same label
+    while True:
+        # Map overlapping boxes to their labels - produces a matrix where each row corresponds to a box and contains the labels of its overlapping neighbors
+        map = torch.where(
+            adj_matrix, labels, num_boxes
+        )  # this num boxes is here cuz you can't have None in tensor and its value is guaranteed to be larger than any valid label
 
-            if torch.equal(labels, new_labels):
-                break
+        # Find the minimum label among all overlapping neighbors
+        new_labels = torch.min(map, dim=1)[
+            0
+        ]  # [0] gives values, while [1] gives indices of min values
 
-            labels = new_labels
+        if torch.equal(labels, new_labels):
+            break
 
-        # Extract final merged box groupings
-        unique_labels = torch.unique(labels)
-        merged_results = []
+        labels = new_labels
 
-        # Iterate over each unique label to form the final merged boxes
-        for label in unique_labels:
-            cluster_mask = (
-                labels == label
-            )  # lets see which boxes belong to the current cluster (those sharing the same label)
-            cluster_boxes = boxes[cluster_mask]  # get boxes of those labels
-            cluster_confs = confs[cluster_mask]  # get confidence scores of those labels
+    # Extract final merged box groupings
+    unique_labels = torch.unique(labels)
+    merged_results = []
 
-            # Merge boxes
-            merged_box = (
-                float(cluster_boxes[:, 0].min()),
-                float(cluster_boxes[:, 1].min()),
-                float(cluster_boxes[:, 2].max()),
-                float(cluster_boxes[:, 3].max()),
-            )
-            merged_conf = float(cluster_confs.max())
+    # Iterate over each unique label to form the final merged boxes
+    for label in unique_labels:
+        cluster_mask = (
+            labels == label
+        )  # lets see which boxes belong to the current cluster (those sharing the same label)
+        cluster_boxes = boxes[cluster_mask]  # get boxes of those labels
+        cluster_confs = confs[cluster_mask]  # get confidence scores of those labels
 
-            merged_results.append((merged_box, merged_conf))
+        # Merge boxes
+        merged_box = (
+            float(cluster_boxes[:, 0].min()),
+            float(cluster_boxes[:, 1].min()),
+            float(cluster_boxes[:, 2].max()),
+            float(cluster_boxes[:, 3].max()),
+        )
+        merged_conf = float(cluster_confs.max())
 
-        return merged_results
+        merged_results.append((merged_box, merged_conf))
+
+    return merged_results
