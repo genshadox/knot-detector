@@ -6,13 +6,17 @@ from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
 from board import build_boards
+from params import (
+    PREDICT_CONF_THRESHOLD,
+    PREDICT_IOU_THRESHOLD,
+    RUNNER_WINDOW_SIZE,
+    RUNNER_WINDOW_STRIDE,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ModelRunner:
-    WINDOW_SIZE = 640
-    WINDOW_STRIDE = 320
 
     def __init__(self, model_path: Path):
         """
@@ -44,7 +48,7 @@ class ModelRunner:
                 x = 0
 
                 while x < board.image.shape[1]:
-                    window_data = board.get_window_data(x, self.WINDOW_SIZE)
+                    window_data = board.get_window_data(x, RUNNER_WINDOW_SIZE)
 
                     results = self.run_inference_single(
                         window_data, board.id, output_folder
@@ -54,12 +58,12 @@ class ModelRunner:
                         logger.warning(
                             f"No boxes attribute on window result for board {board.id}, x={x} — skipping window."
                         )
-                        x += self.WINDOW_STRIDE
+                        x += RUNNER_WINDOW_STRIDE
                         continue
 
                     board.add_window(x, results.orig_shape[1], boxes=results.boxes)
 
-                    x += self.WINDOW_STRIDE
+                    x += RUNNER_WINDOW_STRIDE
 
                 board.save_results(output_folder=output_folder)
 
@@ -93,7 +97,8 @@ class ModelRunner:
                 project=str(output_folder),
                 name=name,
                 exist_ok=True,
-                iou=0.5,
+                iou=PREDICT_IOU_THRESHOLD,
+                conf=PREDICT_CONF_THRESHOLD,
             )
 
             return results[0]  # Only 1 frame so only 1 result (with multiple boxes)
