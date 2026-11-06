@@ -1,7 +1,7 @@
 services:
   runner:
 
-    image: smarti:prod
+    image: knot-detector:prod
 
     build:
       context: .

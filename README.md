@@ -42,7 +42,8 @@ duplicate case (see Known limitations below).
 ## Training
 
 - YOLO11n, pretrained weights. Config: `model/args.yaml`.
-- Board 1043 had a corrupted label - excluded from stats, split into train/val
+- The model was trained on a third-party dataset that is not included in this repo.
+- One board had a corrupted label - excluded from stats, split into train/val
   manually.
 - Train/val split is per-board (not per-frame, since frames within a
   board overlap in the training set) and stratified by max knot size per
@@ -102,19 +103,19 @@ Configure via `.env`:
 
 ## Project structure
 
-- `main.py` - entry point, mode branching
-- `model_runner.py` - YOLO inference, per-window sliding, per-board error isolation
-- `board.py` - `Board`/`Frame`/`Window` model, board-space stitching and merge
-- `params.py` - inference/NMS/merge thresholds
-- `test.py` - test-mode comparison
-- `util.py` - path/label/coordinate helpers
-- `logger.py` - logging setup
-- `model/args.yaml` - training config
+- `src/main.py` - entry point, mode branching
+- `src/model_runner.py` - YOLO inference, per-window sliding, per-board error isolation
+- `src/board.py` - `Board`/`Frame`/`Window` model, board-space stitching and merge
+- `src/params.py` - inference/NMS/merge thresholds
+- `src/test.py` - test-mode comparison
+- `src/util.py` - path/label/coordinate helpers
+- `src/logger.py` - logging setup
+- `src/model/args.yaml` - training config
 - `tests/` - unit tests (pytest, dev-only, not in prod image)
 
 ## Future work
 
 - Further model tuning
-- Re-examine merge threshold if Smarti's real test set behaves
-  differently than our val set
+- Re-examine merge threshold if a different test set behaves
+  differently than the val set
 - Clean up / re-review training labels

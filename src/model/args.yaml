@@ -12,7 +12,7 @@ save_period: -1
 cache: false
 device: ''
 workers: 8
-project: D:/Work/smarti/train/train_1
+project: runs/train_1
 name: yolo11n_train_1-2
 exist_ok: false
 pretrained: true
@@ -113,4 +113,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: tracktrack.yaml
-save_dir: D:\Work\smarti\train\train_1\yolo11n_train_1-2
+save_dir: runs/train_1/yolo11n_train_1-2
